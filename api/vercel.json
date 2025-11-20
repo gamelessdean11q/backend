@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    }
+  ],
+  "env": {
+    "BULK_SMS_API_KEY": "@bulk-sms-api-key",
+    "BULK_SMS_SENDER_ID": "@bulk-sms-sender-id"
+  }
+}
