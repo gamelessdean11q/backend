@@ -36,10 +36,23 @@ export default async function handler(req, res) {
             return res.status(400).json({ error: 'Phone number and user ID are required' });
         }
 
-        // Validate phone number format (should start with country code)
-        const phoneRegex = /^\+?\d{10,15}$/;
-        if (!phoneRegex.test(phoneNumber)) {
-            return res.status(400).json({ error: 'Invalid phone number format' });
+        // Normalize phone number (accept 233XXXXXXXXX or 0XXXXXXXXX formats)
+        let normalizedPhone = phoneNumber.trim();
+
+        // Remove any + symbol
+        normalizedPhone = normalizedPhone.replace(/^\+/, '');
+
+        // If starts with 0, replace with 233
+        if (normalizedPhone.startsWith('0')) {
+            normalizedPhone = '233' + normalizedPhone.substring(1);
+        }
+
+        // Validate Ghana phone number format (233XXXXXXXXX - 12 digits total)
+        const phoneRegex = /^233\d{9}$/;
+        if (!phoneRegex.test(normalizedPhone)) {
+            return res.status(400).json({
+                error: 'Invalid phone number format. Use 233XXXXXXXXX or 0XXXXXXXXX'
+            });
         }
 
         // Check environment variables
@@ -55,10 +68,10 @@ export default async function handler(req, res) {
         const code = generateCode();
         const expiresAt = Date.now() + (5 * 60 * 1000); // 5 minutes expiry
 
-        // Store code with user ID
+        // Store code with user ID (store normalized phone)
         verificationStore.set(userId, {
             code,
-            phoneNumber,
+            phoneNumber: normalizedPhone, // Store normalized format (233XXXXXXXXX)
             expiresAt,
             attempts: 0
         });
@@ -73,11 +86,8 @@ export default async function handler(req, res) {
         // Prepare SMS message
         const message = `Your gigsplan verification code is: ${code}. Valid for 5 minutes. Do not share this code.`;
 
-        // Format phone number (remove + if present)
-        const formattedPhone = phoneNumber.replace('+', '');
-
-        // Send SMS via Bulk SMS Ghana API
-        const smsUrl = `https://clientlogin.bulksmsgh.com/smsapi?key=${encodeURIComponent(apiKey)}&to=${encodeURIComponent(formattedPhone)}&msg=${encodeURIComponent(message)}&sender_id=${encodeURIComponent(senderId)}`;
+        // Send SMS via Bulk SMS Ghana API (use normalized phone without +)
+        const smsUrl = `https://clientlogin.bulksmsgh.com/smsapi?key=${encodeURIComponent(apiKey)}&to=${encodeURIComponent(normalizedPhone)}&msg=${encodeURIComponent(message)}&sender_id=${encodeURIComponent(senderId)}`;
 
         const smsResponse = await fetch(smsUrl);
         const smsResult = await smsResponse.text();
